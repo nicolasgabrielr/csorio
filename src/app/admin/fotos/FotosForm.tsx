@@ -5,13 +5,54 @@ import { updateSettings } from "@/actions/settings";
 
 type Photo = { src: string; alt: string };
 
+async function compressImage(file: File, maxWidth = 2400, quality = 0.88): Promise<File> {
+  if (file.size <= 3 * 1024 * 1024) return file;
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => resolve(blob ? new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }) : file),
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+    img.src = url;
+  });
+}
+
 async function uploadFile(file: File, type: "main" | "gallery"): Promise<string> {
+  const processed = await compressImage(file);
   const fd = new FormData();
-  fd.append("file", file);
+  fd.append("file", processed);
   fd.append("type", type);
   const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || "Error al subir");
+  const text = await res.text();
+  let json: { src?: string; error?: string } = {};
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(
+      res.status === 413
+        ? "La foto es demasiado pesada para el servidor (máx 4.5 MB)"
+        : `Error del servidor (${res.status}): ${text.slice(0, 120) || "Respuesta vacía"}`
+    );
+  }
+  if (!res.ok) throw new Error(json.error || `Error al subir (${res.status})`);
   return json.src as string;
 }
 

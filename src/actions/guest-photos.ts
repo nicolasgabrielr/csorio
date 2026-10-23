@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase";
 import { getSettings } from "@/lib/settings";
 
 export type GuestPhoto = {
@@ -12,8 +12,6 @@ export type GuestPhoto = {
   status: "approved" | "pending";
   created_at: string;
 };
-
-const USE_MOCK = !process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 declare global {
   // eslint-disable-next-line no-var
@@ -37,7 +35,7 @@ export async function createGuestPhoto(data: {
   const settings = await getSettings();
   const status = settings.photos_require_approval === "true" ? "pending" : "approved";
 
-  if (USE_MOCK) {
+  if (!isSupabaseConfigured()) {
     globalThis.__mockGuestPhotos!.push({
       id: `gp-${Date.now()}`,
       ...data,
@@ -56,7 +54,7 @@ export async function createGuestPhoto(data: {
 }
 
 export async function getGuestPhotos(status?: "approved" | "pending"): Promise<GuestPhoto[]> {
-  if (USE_MOCK) {
+  if (!isSupabaseConfigured()) {
     const all = globalThis.__mockGuestPhotos ?? [];
     return status ? all.filter(p => p.status === status) : [...all];
   }
@@ -77,7 +75,7 @@ export async function updateGuestPhotoStatus(
   id: string,
   status: "approved" | "pending"
 ): Promise<{ success: boolean; error?: string }> {
-  if (USE_MOCK) {
+  if (!isSupabaseConfigured()) {
     const photo = globalThis.__mockGuestPhotos?.find(p => p.id === id);
     if (photo) photo.status = status;
     revalidatePhotoPaths();
@@ -94,7 +92,7 @@ export async function updateGuestPhotoStatus(
 export async function deleteGuestPhoto(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
-  if (USE_MOCK) {
+  if (!isSupabaseConfigured()) {
     const idx = globalThis.__mockGuestPhotos?.findIndex(p => p.id === id) ?? -1;
     if (idx !== -1) globalThis.__mockGuestPhotos!.splice(idx, 1);
     revalidatePhotoPaths();

@@ -45,7 +45,13 @@ function SectionCard({ title, children }: { title: string; children: React.React
   );
 }
 
-export default function ConfiguracionForm({ initialSettings }: { initialSettings: AppSettings }) {
+export default function ConfiguracionForm({
+  initialSettings,
+  supabaseConnected = true,
+}: {
+  initialSettings: AppSettings;
+  supabaseConnected?: boolean;
+}) {
   const [form, setForm] = useState<AppSettings>(initialSettings);
   const [accommodations, setAccommodations] = useState<Accommodation[]>(() => {
     try {
@@ -70,6 +76,7 @@ export default function ConfiguracionForm({ initialSettings }: { initialSettings
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   function set(key: keyof AppSettings) {
     return (v: string) => setForm((f) => ({ ...f, [key]: v }));
@@ -93,20 +100,67 @@ export default function ConfiguracionForm({ initialSettings }: { initialSettings
 
   async function handleSave() {
     setSaving(true);
+    setSaveError(null);
     const dataToSave: AppSettings = {
       ...form,
       accommodations: JSON.stringify(accommodations),
       transport_options: JSON.stringify(transport),
       events: JSON.stringify(events),
     };
-    await updateSettings(dataToSave);
+    const res = await updateSettings(dataToSave);
     setSaving(false);
+    if (!res.success) {
+      setSaveError(res.error || "No se pudo guardar en la base de datos");
+      return;
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   }
 
   return (
     <div className="max-w-2xl space-y-6">
+      {/* Origen de Datos (DB vs Mock) */}
+      <SectionCard title="Origen de datos (Base de datos vs. Modo Mock)">
+        <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-md border bg-muted/30">
+          <span className={`inline-block w-2 h-2 rounded-full ${supabaseConnected ? "bg-green-500" : "bg-amber-500"}`} />
+          {supabaseConnected ? (
+            <span className="text-wedding-dark">
+              <strong>Supabase conectado.</strong> Por defecto se usa la base de datos real.
+            </span>
+          ) : (
+            <span className="text-amber-800">
+              <strong>Supabase no detectado en variables de entorno.</strong> Si ya conectaste Supabase en Vercel, al hacer <em>git push</em> o <em>Redeploy</em> se activará automáticamente.
+            </span>
+          )}
+        </div>
+
+        <label className="flex items-center justify-between gap-4 cursor-pointer pt-1">
+          <div>
+            <p className="text-sm font-medium text-wedding-dark">Modo Mock (lista de invitados pre-configurada)</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {form.use_mock_guests === "true"
+                ? "Activado: Mostrando la lista de invitados de prueba (mock-db). Desactivalo para usar tu base de datos de Supabase."
+                : "Desactivado: Usando la lista de invitados, confirmaciones y precios guardados en tu base de datos Supabase."}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={form.use_mock_guests === "true"}
+            onClick={() => set("use_mock_guests")(form.use_mock_guests === "true" ? "false" : "true")}
+            className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors ${
+              form.use_mock_guests === "true" ? "bg-wedding-gold" : "bg-muted"
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transition-transform ${
+                form.use_mock_guests === "true" ? "translate-x-5" : "translate-x-0"
+              }`}
+            />
+          </button>
+        </label>
+      </SectionCard>
+
       {/* Evento */}
       <SectionCard title="Evento">
         <Field label="Nombre de la novia" value={form.bride_name} onChange={set("bride_name")} placeholder="Novia" />
@@ -377,6 +431,11 @@ export default function ConfiguracionForm({ initialSettings }: { initialSettings
       </SectionCard>
 
       {/* Guardar */}
+      {saveError && (
+        <div className="text-sm text-red-700 bg-red-50 border border-red-200 px-4 py-3 rounded-md">
+          Error al guardar: {saveError}
+        </div>
+      )}
       <Button
         onClick={handleSave}
         disabled={saving}

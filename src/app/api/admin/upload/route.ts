@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase";
 
-const USE_MOCK = !process.env.NEXT_PUBLIC_SUPABASE_URL;
+const USE_MOCK = !isSupabaseConfigured();
 const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "photos";
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/avif"];
 
@@ -43,32 +43,57 @@ export async function POST(req: NextRequest) {
   const buffer = Buffer.from(bytes);
 
   if (USE_MOCK) {
-    const subdir = type === "main" ? "main" : "gallery";
-    const dir = join(process.cwd(), "public", "photos", subdir);
-    await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, filename), buffer);
-    const src = `/photos/${subdir}/${filename}`;
-    return NextResponse.json({ src });
+    try {
+      const subdir = type === "main" ? "main" : "gallery";
+      const dir = join(process.cwd(), "public", "photos", subdir);
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, filename), buffer);
+      const src = `/photos/${subdir}/${filename}`;
+      return NextResponse.json({ src });
+    } catch {
+      return NextResponse.json(
+        { error: "Supabase Storage no está activo todavía en este deploy. Hacé git push / Redeploy en Vercel para activar las variables de Supabase." },
+        { status: 500 }
+      );
+    }
   }
 
   // Supabase Storage
-  const admin = createAdminClient();
-  const storagePath = type === "main" ? `main/${filename}` : `gallery/${filename}`;
+  try {
+    const admin = createAdminClient();
+    const storagePath = type === "main" ? `main/${filename}` : `gallery/${filename}`;
 
-  const { error } = await admin.storage
-    .from(STORAGE_BUCKET)
-    .upload(storagePath, buffer, {
-      contentType: file.type,
-      upsert: false,
-    });
+    let { error } = await admin.storage
+      .from(STORAGE_BUCKET)
+      .upload(storagePath, buffer, {
+        contentType: file.type,
+        upsert: false,
+      });
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error && error.message?.toLowerCase().includes("bucket not found")) {
+      await admin.storage.createBucket(STORAGE_BUCKET, { public: true });
+      const retry = await admin.storage
+        .from(STORAGE_BUCKET)
+        .upload(storagePath, buffer, {
+          contentType: file.type,
+          upsert: false,
+        });
+      error = retry.error;
+    }
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const { data: urlData } = admin.storage
+      .from(STORAGE_BUCKET)
+      .getPublicUrl(storagePath);
+
+    return NextResponse.json({ src: urlData.publicUrl });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Error inesperado al subir a Supabase Storage" },
+      { status: 500 }
+    );
   }
-
-  const { data: urlData } = admin.storage
-    .from(STORAGE_BUCKET)
-    .getPublicUrl(storagePath);
-
-  return NextResponse.json({ src: urlData.publicUrl });
 }

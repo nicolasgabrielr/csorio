@@ -3,9 +3,8 @@
 import { createAdminClient, supabase } from "@/lib/supabase";
 import { mockDb } from "@/lib/mock-db";
 import type { Confirmation, CompanionType } from "@/lib/supabase";
+import { isMockMode } from "@/lib/settings";
 import { revalidatePath } from "next/cache";
-
-const USE_MOCK = !process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 export async function confirmAttendance(data: {
   guest_id: string;
@@ -18,7 +17,7 @@ export async function confirmAttendance(data: {
   main_menu?: string;
   total_cost: number;
 }): Promise<{ success: boolean; error?: string }> {
-  if (USE_MOCK) {
+  if (await isMockMode()) {
     if (mockDb.confirmations.findByGuestId(data.guest_id)) {
       return { success: false, error: "Este invitado ya confirmó su asistencia" };
     }
@@ -46,7 +45,7 @@ export async function togglePayment(
   confirmationId: string,
   paid: boolean,
 ): Promise<{ success: boolean; error?: string }> {
-  if (USE_MOCK) {
+  if (await isMockMode()) {
     mockDb.confirmations.update(confirmationId, { paid });
     revalidatePath("/admin/confirmados");
     return { success: true };
@@ -63,7 +62,7 @@ export async function togglePayment(
 }
 
 export async function getConfirmedGuestIds(): Promise<Set<string>> {
-  if (USE_MOCK) {
+  if (await isMockMode()) {
     const ids = mockDb.confirmations.list().map(c => c.guest_id);
     return new Set(ids);
   }
@@ -75,7 +74,7 @@ export async function getConfirmedGuestIds(): Promise<Set<string>> {
 export async function deleteConfirmation(
   id: string,
 ): Promise<{ success: boolean; error?: string }> {
-  if (USE_MOCK) {
+  if (await isMockMode()) {
     mockDb.confirmations.delete(id);
     return { success: true };
   }
@@ -90,7 +89,7 @@ export async function deleteConfirmation(
 }
 
 export async function listConfirmations(): Promise<Confirmation[]> {
-  if (USE_MOCK) return mockDb.confirmations.list() as Confirmation[];
+  if (await isMockMode()) return mockDb.confirmations.list() as Confirmation[];
 
   const { data, error } = await supabase
     .from("confirmations")
@@ -123,7 +122,7 @@ function calcCoupleCover(
 }
 
 export async function getMetrics() {
-  if (USE_MOCK) {
+  if (await isMockMode()) {
     const allGuests = mockDb.guests.list();
     const confirmations = mockDb.confirmations.list();
     const confirmedIds = new Set(confirmations.map(c => c.guest_id));

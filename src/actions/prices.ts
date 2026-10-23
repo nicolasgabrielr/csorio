@@ -3,7 +3,7 @@
 import { mockDb } from "@/lib/mock-db";
 import type { Prices } from "@/lib/mock-db";
 import { getSettings } from "@/lib/settings";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
 
 export type FixedCosts = {
@@ -17,12 +17,10 @@ export type FixedCosts = {
   vestido: number;
 };
 
-const USE_MOCK = !process.env.NEXT_PUBLIC_SUPABASE_URL;
-
 // ─── Precios por acompañante ──────────────────────────────────────────────────
 
 export async function getPrices(): Promise<Prices> {
-  if (USE_MOCK) return mockDb.prices.get();
+  if (!isSupabaseConfigured()) return mockDb.prices.get();
 
   try {
     const admin = createAdminClient();
@@ -45,7 +43,7 @@ export async function getPrices(): Promise<Prices> {
 }
 
 export async function updatePrices(data: Prices): Promise<{ success: boolean; error?: string }> {
-  if (USE_MOCK) {
+  if (!isSupabaseConfigured()) {
     mockDb.prices.update(data);
     revalidatePath("/admin/precios");
     revalidatePath("/admin/invitados");
@@ -86,7 +84,7 @@ export async function getFixedCosts(): Promise<FixedCosts> {
 }
 
 export async function updateFixedCosts(data: FixedCosts): Promise<{ success: boolean; error?: string }> {
-  if (USE_MOCK) {
+  if (!isSupabaseConfigured()) {
     if (!globalThis.__mockSettings) globalThis.__mockSettings = {};
     globalThis.__mockSettings.cost_salon      = String(data.salon);
     globalThis.__mockSettings.cost_deco       = String(data.deco);

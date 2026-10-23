@@ -3,10 +3,8 @@
 import { createAdminClient, supabase } from "@/lib/supabase";
 import { mockDb } from "@/lib/mock-db";
 import type { Guest, LockedCompanion } from "@/lib/supabase";
-import { getSettings } from "@/lib/settings";
+import { getSettings, isMockMode } from "@/lib/settings";
 import { revalidatePath } from "next/cache";
-
-const USE_MOCK = !process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 export type CompanionSuggestion = {
   companionName: string;
@@ -60,8 +58,9 @@ export async function searchGuest(name: string): Promise<{
 
   const settings = await getSettings();
   const suggestionsEnabled = settings.companion_suggestions !== "false";
+  const useMock = settings.use_mock_guests === "true" || !(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL);
 
-  if (USE_MOCK) {
+  if (useMock) {
     const allGuests = mockDb.guests.list();
     const normFn = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
     const matches = mockDb.guests.searchAll(name.trim());
@@ -130,7 +129,7 @@ export async function getGuestForConfirmation(id: string): Promise<{
   guest: Guest | null;
   alreadyConfirmed: boolean;
 }> {
-  if (USE_MOCK) {
+  if (await isMockMode()) {
     const guest = mockDb.guests.list().find(g => g.id === id) ?? null;
     if (!guest) return { guest: null, alreadyConfirmed: false };
     const alreadyConfirmed = !!mockDb.confirmations.findByGuestId(id);
@@ -147,7 +146,7 @@ export async function getGuestForConfirmation(id: string): Promise<{
 }
 
 export async function listGuests(): Promise<Guest[]> {
-  if (USE_MOCK) return mockDb.guests.list();
+  if (await isMockMode()) return mockDb.guests.list();
 
   const { data, error } = await supabase.from("guests").select("*").order("full_name");
   if (error) return [];
@@ -170,7 +169,7 @@ type GuestData = {
 };
 
 export async function createGuest(data: GuestData): Promise<{ success: boolean; error?: string }> {
-  if (USE_MOCK) {
+  if (await isMockMode()) {
     mockDb.guests.create(data);
     revalidatePath("/admin/invitados");
     return { success: true };
@@ -184,7 +183,7 @@ export async function createGuest(data: GuestData): Promise<{ success: boolean; 
 }
 
 export async function updateGuest(id: string, data: GuestData): Promise<{ success: boolean; error?: string }> {
-  if (USE_MOCK) {
+  if (await isMockMode()) {
     mockDb.guests.update(id, data);
     revalidatePath("/admin/invitados");
     return { success: true };
@@ -198,7 +197,7 @@ export async function updateGuest(id: string, data: GuestData): Promise<{ succes
 }
 
 export async function deleteGuest(id: string): Promise<{ success: boolean; error?: string }> {
-  if (USE_MOCK) {
+  if (await isMockMode()) {
     mockDb.guests.delete(id);
     revalidatePath("/admin/invitados");
     revalidatePath("/admin/confirmados");
