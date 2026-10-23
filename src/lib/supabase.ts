@@ -1,12 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
+const rawSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
+const rawSupabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+
+const supabaseUrl = rawSupabaseUrl || "https://placeholder.supabase.co";
+const supabaseAnonKey = rawSupabaseAnonKey || "placeholder-anon-key";
+
+export function isSupabaseConfigured(): boolean {
+  return Boolean(rawSupabaseUrl && !rawSupabaseUrl.includes("placeholder.supabase.co"));
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export function createAdminClient() {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "placeholder-service-key";
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || rawSupabaseAnonKey || "placeholder-service-key";
   return createClient(supabaseUrl, serviceRoleKey);
 }
 

@@ -1,4 +1,4 @@
-import { createAdminClient } from "./supabase";
+import { createAdminClient, isSupabaseConfigured } from "./supabase";
 
 export type EventItem = {
   title: string;
@@ -58,23 +58,24 @@ export type AppSettings = {
   rsvp_text: string;
   rsvp_deadline: string; // YYYY-MM-DD, vacío = usa wedding_date
   photos_require_approval: string; // "true" | "false"
+  use_mock_guests: string; // "true" | "false"
 };
 
-export function getEnvDefaults(): AppSettings {
+export function getDefaultSettings(): AppSettings {
   return {
-    bride_name: process.env.NEXT_PUBLIC_BRIDE_NAME ?? "",
-    groom_name: process.env.NEXT_PUBLIC_GROOM_NAME ?? "",
-    wedding_date: process.env.NEXT_PUBLIC_WEDDING_DATE ?? "",
-    venue_name: process.env.NEXT_PUBLIC_VENUE_NAME ?? "",
-    venue_address: process.env.NEXT_PUBLIC_VENUE_ADDRESS ?? "",
-    venue_maps_url: process.env.NEXT_PUBLIC_VENUE_MAPS_URL ?? "",
-    venue_maps_embed: process.env.NEXT_PUBLIC_VENUE_MAPS_EMBED ?? "",
-    cbu_ars: process.env.NEXT_PUBLIC_CBU ?? "",
-    alias_ars: process.env.NEXT_PUBLIC_ALIAS ?? "",
-    holder_ars: process.env.NEXT_PUBLIC_BANK_HOLDER ?? "",
-    cbu_usd: process.env.NEXT_PUBLIC_CBU_USD ?? "",
-    alias_usd: process.env.NEXT_PUBLIC_ALIAS_USD ?? "",
-    holder_usd: process.env.NEXT_PUBLIC_BANK_HOLDER_USD ?? "",
+    bride_name: "María",
+    groom_name: "Juan",
+    wedding_date: "2027-02-06",
+    venue_name: "Salón La Armonía",
+    venue_address: "Av. Libertador 1234, Buenos Aires",
+    venue_maps_url: "",
+    venue_maps_embed: "",
+    cbu_ars: "0000000000000000000000",
+    alias_ars: "novios.casamiento",
+    holder_ars: "María García",
+    cbu_usd: "",
+    alias_usd: "",
+    holder_usd: "",
     accommodations: "[]",
     main_photo: "",
     gallery_photos: "[]",
@@ -91,29 +92,28 @@ export function getEnvDefaults(): AppSettings {
     gifts_body: "Pero si querés hacernos un regalo, podés hacerlo a través de una transferencia. Cada contribución nos ayuda a comenzar esta nueva etapa juntos.",
     gifts_footer: "Gracias por hacernos parte de tu vida. ❤️",
     events: JSON.stringify([
-      { title: "Ceremonia", venue: "Parroquia Nuestra Señora del Rosario", address: "Bergplace 1387, Buenos Aires", date: "8 de octubre", time: "12:00 hs", maps_url: "", icon: "church" },
-      { title: "Civil", venue: "Registro Civil N° 17", address: "Av. Córdoba 1235, Buenos Aires", date: "8 de octubre", time: "10:00 hs", maps_url: "", icon: "civil" },
-      { title: "Festejo", venue: "El Castillo", address: "Av. Figueroa Alcorta 3979, Buenos Aires", date: "8 de octubre", time: "20:00 hs", maps_url: "", icon: "party" },
+      { title: "Ceremonia", venue: "Parroquia Nuestra Señora del Rosario", address: "Av. Ejemplo 1234", date: "6 de febrero", time: "18:00 hs", maps_url: "", icon: "church" },
+      { title: "Civil", venue: "Registro Civil", address: "Av. Ejemplo 567", date: "6 de febrero", time: "12:00 hs", maps_url: "", icon: "civil" },
+      { title: "Festejo", venue: "Salón La Armonía", address: "Av. Libertador 1234", date: "6 de febrero", time: "20:00 hs", maps_url: "", icon: "party" },
     ] as EventItem[]),
     gallery_title: "Momentos únicos",
     gallery_subtitle: "Álbum de Fotos",
     rsvp_text: "Esperamos contar con tu presencia",
     rsvp_deadline: "",
     photos_require_approval: "false",
+    use_mock_guests: "false",
     transport_options: JSON.stringify([
       { emoji: "🚗", title: "En auto", description: "Hay estacionamiento disponible en el lugar" },
-      { emoji: "✈️", title: "Aeropuerto", description: "A 30 mins del Aeropuerto de San Luis (LUQ)" },
+      { emoji: "✈️", title: "Aeropuerto", description: "A 30 mins del aeropuerto" },
       { emoji: "🚕", title: "Taxi / remis", description: "Podés usar Uber, Cabify o remis local" },
     ]),
   };
 }
 
-const USE_MOCK = !process.env.NEXT_PUBLIC_SUPABASE_URL;
-
 export async function getSettings(): Promise<AppSettings> {
-  const defaults = getEnvDefaults();
+  const defaults = getDefaultSettings();
 
-  if (USE_MOCK) {
+  if (!isSupabaseConfigured()) {
     const mockOverrides = globalThis.__mockSettings ?? {};
     return { ...defaults, ...mockOverrides };
   }
@@ -137,4 +137,10 @@ export async function getSettings(): Promise<AppSettings> {
   } catch {
     return defaults;
   }
+}
+
+export async function isMockMode(): Promise<boolean> {
+  if (!isSupabaseConfigured()) return true;
+  const settings = await getSettings();
+  return settings.use_mock_guests === "true";
 }

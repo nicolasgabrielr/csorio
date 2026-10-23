@@ -1,24 +1,23 @@
--- Invitados cargados por el admin
-CREATE TABLE guests (
+-- 1. Invitados cargados por el admin
+CREATE TABLE IF NOT EXISTS guests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   full_name TEXT NOT NULL,
   allows_companion BOOLEAN DEFAULT false,
-  -- Lista cerrada: acompañantes pre-definidos por el admin
+  main_cost DECIMAL(10,2) DEFAULT 0,
   locked_companions JSONB DEFAULT '[]',
-  -- Acompañantes adicionales libres
   max_adults INTEGER DEFAULT 0,
   adult_cost DECIMAL(10,2) DEFAULT 0,
-  max_over12 INTEGER DEFAULT 0,     -- mayores de 12 años
+  max_over12 INTEGER DEFAULT 0,
   over12_cost DECIMAL(10,2) DEFAULT 0,
-  max_under12 INTEGER DEFAULT 0,    -- menores de 12 años
+  max_under12 INTEGER DEFAULT 0,
   under12_cost DECIMAL(10,2) DEFAULT 0,
   phrase_type TEXT DEFAULT 'friends',
   custom_phrase TEXT DEFAULT '',
   created_at TIMESTAMP DEFAULT now()
 );
 
--- Confirmaciones hechas por los invitados
-CREATE TABLE confirmations (
+-- 2. Confirmaciones hechas por los invitados
+CREATE TABLE IF NOT EXISTS confirmations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   guest_id UUID REFERENCES guests(id) ON DELETE CASCADE,
   dni TEXT,
@@ -33,61 +32,24 @@ CREATE TABLE confirmations (
   confirmed_at TIMESTAMP DEFAULT now()
 );
 
--- Para bases existentes, agregar las columnas con:
--- ALTER TABLE confirmations ADD COLUMN IF NOT EXISTS paid BOOLEAN DEFAULT false;
--- ALTER TABLE confirmations ADD COLUMN IF NOT EXISTS under5_count INTEGER DEFAULT 0;
--- ALTER TABLE confirmations ADD COLUMN IF NOT EXISTS main_menu TEXT DEFAULT 'Ninguno';
+-- 3. Fotos subidas por los invitados
+CREATE TABLE IF NOT EXISTS guest_photos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  guest_name TEXT NOT NULL,
+  description TEXT DEFAULT '',
+  photo_url TEXT NOT NULL,
+  status TEXT DEFAULT 'approved',
+  created_at TIMESTAMP DEFAULT now()
+);
 
--- Índice para búsqueda por nombre
-CREATE EXTENSION IF NOT EXISTS unaccent;
-CREATE INDEX idx_guests_full_name ON guests USING gin(to_tsvector('spanish', full_name));
-
--- Datos de prueba
-INSERT INTO guests (full_name, allows_companion, locked_companions, phrase_type) VALUES
-  ('Enzo Casalegno', true, '[]', 'friends'),
-  ('Diego Fornero', false, '[{"name":"María Fornero","type":"adult"},{"name":"Ana Fornero","type":"under12"}]', 'family');
-
--- Configuración editable desde el admin
-CREATE TABLE settings (
+-- 4. Configuración y precios editables desde el admin
+CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMP DEFAULT now()
 );
 
-INSERT INTO settings (key, value) VALUES
-  ('bride_name', ''),
-  ('groom_name', ''),
-  ('wedding_date', ''),
-  ('venue_name', ''),
-  ('venue_address', ''),
-  ('venue_maps_url', ''),
-  ('venue_maps_embed', ''),
-  ('cbu_ars', ''),
-  ('alias_ars', ''),
-  ('holder_ars', ''),
-  ('cbu_usd', ''),
-  ('alias_usd', ''),
-  ('holder_usd', ''),
-  ('accommodations', '[]'),
-  ('main_photo', ''),
-  ('gallery_photos', '[]'),
-  ('gallery_title', 'Momentos únicos'),
-  ('gallery_subtitle', 'Álbum de Fotos'),
-  ('rsvp_text', 'Esperamos contar con tu presencia'),
-  ('rsvp_deadline', ''),
-  ('events', '[{"title":"Ceremonia","venue":"","address":"","date":"","time":"","maps_url":"","icon":"church"},{"title":"Civil","venue":"","address":"","date":"","time":"","maps_url":"","icon":"civil"},{"title":"Festejo","venue":"","address":"","date":"","time":"","maps_url":"","icon":"party"}]'),
-  ('cost_salon', '0'),
-  ('cost_dj', '0'),
-  ('cost_cotillon', '0'),
-  ('cost_catering', '0');
-
--- =============================================
--- Supabase Storage para fotos
--- =============================================
--- Crear bucket "photos" con acceso público desde el Dashboard:
---   Storage > New bucket > Name: "photos" > Public: true
---
--- O ejecutar:
--- INSERT INTO storage.buckets (id, name, public) VALUES ('photos', 'photos', true);
---
--- Agregar env var: SUPABASE_STORAGE_BUCKET=photos (o dejar vacío, usa "photos" por defecto)
+-- 5. Bucket público para guardar las fotos (hero, galería y fotos de invitados)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('photos', 'photos', true)
+ON CONFLICT (id) DO NOTHING;

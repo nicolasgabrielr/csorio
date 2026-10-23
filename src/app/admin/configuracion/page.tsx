@@ -1,10 +1,12 @@
 import { getSettings } from "@/lib/settings";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import ConfiguracionForm from "./ConfiguracionForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConfiguracionPage() {
   const settings = await getSettings();
+  const supabaseConnected = isSupabaseConfigured();
 
   return (
     <div>
@@ -14,7 +16,7 @@ export default async function ConfiguracionPage() {
           Editá el contenido del sitio: nombres, fecha, lugar, datos bancarios y alojamientos.
         </p>
       </div>
-      <ConfiguracionForm initialSettings={settings} />
+      <ConfiguracionForm initialSettings={settings} supabaseConnected={supabaseConnected} />
     </div>
   );
 }

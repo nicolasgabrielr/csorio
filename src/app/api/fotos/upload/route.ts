@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase";
 
-const USE_MOCK = !process.env.NEXT_PUBLIC_SUPABASE_URL;
+const USE_MOCK = !isSupabaseConfigured();
 const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "photos";
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/avif"];
 const MAX_MB = 10;

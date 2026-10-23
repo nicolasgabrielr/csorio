@@ -9,6 +9,8 @@ import RegalosModal from "@/components/wedding/RegalosModal";
 import { getSettings } from "@/lib/settings";
 import type { EventItem } from "@/lib/settings";
 
+export const dynamic = "force-dynamic";
+
 function getPhotosFromFilesystem(): { src: string; alt: string }[] {
   try {
     const dir = join(process.cwd(), "public", "photos", "gallery");

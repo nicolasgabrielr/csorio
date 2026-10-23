@@ -2,20 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { getSettings as _getSettings, type AppSettings } from "@/lib/settings";
-import { createAdminClient } from "@/lib/supabase";
+import { createAdminClient, isSupabaseConfigured } from "@/lib/supabase";
 
 export { _getSettings as getSettings };
 
-const USE_MOCK = !process.env.NEXT_PUBLIC_SUPABASE_URL;
-
 export async function updateSettings(data: Partial<AppSettings>): Promise<{ success: boolean; error?: string }> {
-  if (USE_MOCK) {
-    if (!globalThis.__mockSettings) {
-      globalThis.__mockSettings = {};
-    }
-    for (const [key, value] of Object.entries(data)) {
-      globalThis.__mockSettings[key] = value as string;
-    }
+  if (!globalThis.__mockSettings) {
+    globalThis.__mockSettings = {};
+  }
+  for (const [key, value] of Object.entries(data)) {
+    globalThis.__mockSettings[key] = value as string;
+  }
+
+  if (!isSupabaseConfigured()) {
     revalidatePaths();
     return { success: true };
   }
@@ -43,9 +42,14 @@ export async function updateSettings(data: Partial<AppSettings>): Promise<{ succ
 
 function revalidatePaths() {
   revalidatePath("/");
+  revalidatePath("/confirmar");
   revalidatePath("/lugar");
   revalidatePath("/regalos");
   revalidatePath("/galeria");
+  revalidatePath("/admin/invitados");
+  revalidatePath("/admin/confirmados");
+  revalidatePath("/admin/metricas");
+  revalidatePath("/admin/precios");
   revalidatePath("/admin/configuracion");
   revalidatePath("/admin/fotos");
   revalidatePath("/admin/fotos-invitados");
